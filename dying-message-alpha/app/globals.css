@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(116,77,201,.45), transparent 30%),
+    radial-gradient(circle at 85% 80%, rgba(75,35,112,.5), transparent 35%),
+    linear-gradient(135deg, #110d22, #211741 55%, #100c1d);
+  color: white;
+}
+
+.card-paper {
+  background: linear-gradient(#f6ecd9, #e7d7bd);
+  color: #211934;
+}
