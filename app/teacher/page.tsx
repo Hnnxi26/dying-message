@@ -1,7 +1,7 @@
 'use client';
 
 import { QRCodeSVG } from 'qrcode.react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   HintTarget,
   Tile,
@@ -228,9 +228,8 @@ export default function Teacher() {
     saveRoom({ ...room });
   }
 
-  const unusedTiles = useMemo(
-    () => room.openTiles.filter((tile) => !used.has(tile.id) && !drafted.has(tile.id)),
-    [room, used, drafted]
+  const unusedTiles = room.openTiles.filter(
+    (tile) => !used.has(tile.id) && !drafted.has(tile.id)
   );
 
   return (
