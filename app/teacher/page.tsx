@@ -82,7 +82,7 @@ function CandidatePanel({
 export default function Teacher() {
   const room = useRoom();
   const [dragOver, setDragOver] = useState<HintTarget | 'pool' | null>(null);
-  const url = typeof window === 'undefined' ? '' : `${window.location.origin}/student`;
+  const url = typeof window === 'undefined' ? '' : `${window.location.origin}/student?room=${room?.code ?? ''}`;
 
   if (!room) {
     return (
