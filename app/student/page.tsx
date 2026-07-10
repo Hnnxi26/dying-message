@@ -103,6 +103,8 @@ export default function Student() {
   }
 
   function verifyRoom() {
+     if (!room) return;
+ 
     const normalized = roomCode.trim().toUpperCase();
 
     if (!normalized) {
