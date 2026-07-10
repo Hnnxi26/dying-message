@@ -1,11 +1,14 @@
 'use client';
 
 import { QRCodeSVG } from 'qrcode.react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   HintTarget,
-  createRoom,
+  Tile,
   canNext,
+  createRoom,
+  draftTileIds,
+  ensureDraftHints,
   nextRound,
   resolveTeam,
   usedTileIds
@@ -18,18 +21,63 @@ const labels: Record<HintTarget, string> = {
   motive: '동기'
 };
 
-function Chip({ word, type }: { word: string; type: 'adjective' | 'noun' }) {
+type DragPayload =
+  | { source: 'pool'; tileId: string }
+  | { source: 'draft'; tileId: string; from: HintTarget };
+
+function Chip({
+  tile,
+  draggable = false,
+  onDragStart
+}: {
+  tile: Tile;
+  draggable?: boolean;
+  onDragStart?: (event: React.DragEvent<HTMLDivElement>) => void;
+}) {
   return (
-    <span className={`inline-flex rounded-xl px-3 py-2 text-sm font-black text-white ${type === 'adjective' ? 'bg-red-600' : 'bg-blue-600'}`}>
-      {word}
-    </span>
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      className={[
+        'inline-flex select-none rounded-xl px-3 py-2 text-sm font-black text-white shadow',
+        draggable ? 'cursor-grab active:cursor-grabbing' : '',
+        tile.type === 'adjective' ? 'bg-red-600' : 'bg-blue-600'
+      ].join(' ')}
+    >
+      {tile.word}
+    </div>
+  );
+}
+
+function CandidatePanel({
+  title,
+  items,
+  answer
+}: {
+  title: string;
+  items: string[];
+  answer: string;
+}) {
+  return (
+    <section className="rounded-2xl border border-white/15 bg-black/15 p-4">
+      <h3 className="font-black">{title}</h3>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {items.map((item) => (
+          <div
+            key={item}
+            className={`rounded-xl px-3 py-2 text-center text-sm font-bold ${item === answer ? 'border border-raven-gold bg-raven-gold/20 text-raven-gold' : 'bg-white/10'}`}
+          >
+            {item}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
 export default function Teacher() {
   const room = useRoom();
-  const [target, setTarget] = useState<HintTarget>('criminal');
-  const [selected, setSelected] = useState('');
+  const [dragOver, setDragOver] = useState<HintTarget | 'pool' | null>(null);
   const url = typeof window === 'undefined' ? '' : `${window.location.origin}/student`;
 
   if (!room) {
@@ -44,35 +92,111 @@ export default function Teacher() {
           >
             방 만들기
           </button>
-          <p className="mt-5 text-white/60">v0.6 오프라인 교실 테스트 버전</p>
+          <p className="mt-5 text-white/60">v0.6.1 힌트 UX 개선판</p>
         </section>
       </main>
     );
   }
 
-  function publish() {
-    if (!room) return;
-    const tile = room.openTiles.find((item) => item.id === selected);
-    if (!tile) return;
-
-    room.hints[target].push(tile);
-    setSelected('');
-    saveRoom({ ...room });
-  }
-
-  function goNextRound() {
-    if (!room) return;
-    nextRound(room);
-    saveRoom({ ...room });
-  }
-
-  function judgeTeam(teamName: string) {
-    if (!room) return;
-    resolveTeam(room, teamName);
-    saveRoom({ ...room });
-  }
+  ensureDraftHints(room);
 
   const used = usedTileIds(room);
+  const drafted = draftTileIds(room);
+  const publishedCount = Object.values(room.hints).flat().length;
+  const draftCount = Object.values(room.draftHints).flat().length;
+  const firstPublish = publishedCount === 0;
+
+  function writeDragData(event: React.DragEvent, payload: DragPayload) {
+    event.dataTransfer.setData('application/json', JSON.stringify(payload));
+    event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function readDragData(event: React.DragEvent): DragPayload | null {
+    try {
+      return JSON.parse(event.dataTransfer.getData('application/json')) as DragPayload;
+    } catch {
+      return null;
+    }
+  }
+
+  function removeDraft(tileId: string, from: HintTarget) {
+    room.draftHints[from] = room.draftHints[from].filter((tile) => tile.id !== tileId);
+  }
+
+  function addDraft(tile: Tile, target: HintTarget) {
+    const alreadyPublished = used.has(tile.id);
+    const alreadyDrafted = drafted.has(tile.id);
+    if (alreadyPublished || alreadyDrafted) return;
+
+    if (!firstPublish && draftCount >= 1) {
+      alert('추가 힌트는 한 번에 1개만 공개할 수 있습니다.');
+      return;
+    }
+
+    room.draftHints[target].push(tile);
+  }
+
+  function dropOnTarget(event: React.DragEvent, target: HintTarget) {
+    event.preventDefault();
+    setDragOver(null);
+    const payload = readDragData(event);
+    if (!payload) return;
+
+    if (payload.source === 'pool') {
+      const tile = room.openTiles.find((item) => item.id === payload.tileId);
+      if (!tile) return;
+      addDraft(tile, target);
+    } else {
+      if (payload.from === target) return;
+      const tile = room.draftHints[payload.from].find((item) => item.id === payload.tileId);
+      if (!tile) return;
+      removeDraft(payload.tileId, payload.from);
+      room.draftHints[target].push(tile);
+    }
+
+    saveRoom({ ...room });
+  }
+
+  function dropBackToPool(event: React.DragEvent) {
+    event.preventDefault();
+    setDragOver(null);
+    const payload = readDragData(event);
+    if (!payload || payload.source !== 'draft') return;
+    removeDraft(payload.tileId, payload.from);
+    saveRoom({ ...room });
+  }
+
+  function publishAll() {
+    if (draftCount === 0) {
+      alert('공개할 힌트가 없습니다.');
+      return;
+    }
+
+    if (!firstPublish && draftCount !== 1) {
+      alert('추가 힌트는 정확히 1개만 공개할 수 있습니다.');
+      return;
+    }
+
+    if (firstPublish && draftCount !== 6) {
+      const ok = confirm(`처음 힌트는 보통 6개입니다. 현재 ${draftCount}개입니다. 그대로 공개할까요?`);
+      if (!ok) return;
+    }
+
+    const ok = confirm('공개 후에는 수정할 수 없습니다. 학생에게 한 번에 공개할까요?');
+    if (!ok) return;
+
+    (Object.keys(labels) as HintTarget[]).forEach((key) => {
+      room.hints[key].push(...room.draftHints[key]);
+    });
+
+    room.draftHints = { criminal: [], weapon: [], motive: [] };
+    saveRoom({ ...room });
+  }
+
+  const unusedTiles = useMemo(
+    () => room.openTiles.filter((tile) => !used.has(tile.id) && !drafted.has(tile.id)),
+    [room, used, drafted]
+  );
 
   return (
     <main className="min-h-screen p-5">
@@ -99,7 +223,10 @@ export default function Teacher() {
           <button
             type="button"
             disabled={!canNext(room) || room.round >= 4}
-            onClick={goNextRound}
+            onClick={() => {
+              nextRound(room);
+              saveRoom({ ...room });
+            }}
             className="rounded-2xl bg-raven-gold px-5 py-3 font-black text-raven-bg disabled:opacity-40"
           >
             다음 라운드
@@ -110,57 +237,98 @@ export default function Teacher() {
       <div className="grid grid-cols-[1fr_380px] gap-4">
         <section className="space-y-4">
           <article className="rounded-3xl border border-raven-gold/40 bg-raven-gold/10 p-5">
-            <h2 className="text-2xl font-black">정답</h2>
-            <div className="mt-3 grid grid-cols-3 gap-3">
-              <div>범인<br /><b>{room.answer.criminal}</b></div>
-              <div>도구<br /><b>{room.answer.weapon}</b></div>
-              <div>동기<br /><b>{room.answer.motive}</b></div>
+            <h2 className="text-2xl font-black">정답 및 후보 카드</h2>
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <CandidatePanel title="범인 후보 9명" items={room.candidates.criminals} answer={room.answer.criminal} />
+              <CandidatePanel title="도구 후보 9개" items={room.candidates.weapons} answer={room.answer.weapon} />
+              <CandidatePanel title="동기 후보 9개" items={room.candidates.motives} answer={room.answer.motive} />
             </div>
+            <p className="mt-3 text-sm text-white/60">노란색 테두리가 정답입니다. 교사 화면에만 표시됩니다.</p>
           </article>
 
           <article className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
-            <h2 className="text-2xl font-black">공통 힌트</h2>
-
-            <div className="mt-3 grid grid-cols-3 gap-3">
-              {(Object.keys(labels) as HintTarget[]).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setTarget(key)}
-                  className={`rounded-2xl border-2 border-dashed p-4 text-left ${target === key ? 'border-raven-gold bg-raven-gold/10' : 'border-white/20'}`}
-                >
-                  <b>{labels[key]}</b>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {room.hints[key].map((tile) => (
-                      <Chip key={tile.id} word={tile.word} type={tile.type} />
-                    ))}
-                  </div>
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black">힌트 편집</h2>
+                <p className="mt-1 text-sm text-white/60">
+                  타일을 드래그해 임시 배치하고, 공개 버튼을 누르면 학생에게 한 번에 공개됩니다.
+                </p>
+              </div>
+              <div className="rounded-xl bg-black/20 px-3 py-2 text-sm">
+                임시 배치 {draftCount}개
+              </div>
             </div>
 
-            <h3 className="mt-5 font-black">공개 타일</h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {room.openTiles.map((tile) => (
-                <button
-                  key={tile.id}
-                  type="button"
-                  disabled={used.has(tile.id)}
-                  onClick={() => setSelected(tile.id)}
-                  className={`${selected === tile.id ? 'ring-4 ring-raven-gold' : ''} ${used.has(tile.id) ? 'opacity-30' : ''}`}
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragOver('pool');
+              }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={dropBackToPool}
+              className={`mt-5 rounded-2xl border-2 border-dashed p-4 transition ${dragOver === 'pool' ? 'border-raven-gold bg-raven-gold/10' : 'border-white/20'}`}
+            >
+              <h3 className="font-black">공개 타일 보드</h3>
+              <p className="mt-1 text-xs text-white/50">임시 힌트를 이 영역으로 다시 드롭하면 취소됩니다.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {unusedTiles.map((tile) => (
+                  <Chip
+                    key={tile.id}
+                    tile={tile}
+                    draggable
+                    onDragStart={(event) => writeDragData(event, { source: 'pool', tileId: tile.id })}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              {(Object.keys(labels) as HintTarget[]).map((key) => (
+                <div
+                  key={key}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragOver(key);
+                  }}
+                  onDragLeave={() => setDragOver(null)}
+                  onDrop={(event) => dropOnTarget(event, key)}
+                  className={`min-h-40 rounded-2xl border-2 border-dashed p-4 transition ${dragOver === key ? 'border-raven-gold bg-raven-gold/10' : 'border-white/20'}`}
                 >
-                  <Chip word={tile.word} type={tile.type} />
-                </button>
+                  <h3 className="font-black">{labels[key]} 힌트</h3>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {room.hints[key].map((tile) => (
+                      <div key={tile.id} className="relative">
+                        <Chip tile={tile} />
+                        <span className="absolute -right-1 -top-2 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px]">🔒</span>
+                      </div>
+                    ))}
+
+                    {room.draftHints[key].map((tile) => (
+                      <div key={tile.id} className="rounded-xl ring-4 ring-raven-gold/40">
+                        <Chip
+                          tile={tile}
+                          draggable
+                          onDragStart={(event) =>
+                            writeDragData(event, { source: 'draft', tileId: tile.id, from: key })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mt-4 text-xs text-white/50">여기로 드롭</p>
+                </div>
               ))}
             </div>
 
             <button
               type="button"
-              disabled={!selected}
-              onClick={publish}
-              className="mt-4 rounded-2xl bg-raven-gold px-5 py-3 font-black text-raven-bg disabled:opacity-40"
+              disabled={draftCount === 0}
+              onClick={publishAll}
+              className="mt-5 w-full rounded-2xl bg-raven-gold px-5 py-4 text-lg font-black text-raven-bg disabled:opacity-40"
             >
-              선택 타일을 {labels[target]} 힌트로 공개
+              학생에게 한 번에 공개
             </button>
           </article>
         </section>
@@ -187,7 +355,10 @@ export default function Teacher() {
                   {team.pending && (
                     <button
                       type="button"
-                      onClick={() => judgeTeam(team.name)}
+                      onClick={() => {
+                        resolveTeam(room, team.name);
+                        saveRoom({ ...room });
+                      }}
                       className="mt-2 rounded-xl bg-raven-gold px-3 py-2 font-black text-raven-bg"
                     >
                       자동 판정
