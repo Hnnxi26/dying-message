@@ -65,7 +65,11 @@ function CandidatePanel({
         {items.map((item) => (
           <div
             key={item}
-            className={`rounded-xl px-3 py-2 text-center text-sm font-bold ${item === answer ? 'border border-raven-gold bg-raven-gold/20 text-raven-gold' : 'bg-white/10'}`}
+            className={`rounded-xl px-3 py-2 text-center text-sm font-bold ${
+              item === answer
+                ? 'border border-raven-gold bg-raven-gold/20 text-raven-gold'
+                : 'bg-white/10'
+            }`}
           >
             {item}
           </div>
@@ -120,15 +124,21 @@ export default function Teacher() {
   }
 
   function removeDraft(tileId: string, from: HintTarget) {
+    if (!room) return;
     room.draftHints[from] = room.draftHints[from].filter((tile) => tile.id !== tileId);
   }
 
   function addDraft(tile: Tile, target: HintTarget) {
-    const alreadyPublished = used.has(tile.id);
-    const alreadyDrafted = drafted.has(tile.id);
-    if (alreadyPublished || alreadyDrafted) return;
+    if (!room) return;
 
-    if (!firstPublish && draftCount >= 1) {
+    const currentUsed = usedTileIds(room);
+    const currentDrafted = draftTileIds(room);
+    const currentDraftCount = Object.values(room.draftHints).flat().length;
+    const isFirstPublish = Object.values(room.hints).flat().length === 0;
+
+    if (currentUsed.has(tile.id) || currentDrafted.has(tile.id)) return;
+
+    if (!isFirstPublish && currentDraftCount >= 1) {
       alert('추가 힌트는 한 번에 1개만 공개할 수 있습니다.');
       return;
     }
@@ -137,8 +147,11 @@ export default function Teacher() {
   }
 
   function dropOnTarget(event: React.DragEvent, target: HintTarget) {
+    if (!room) return;
+
     event.preventDefault();
     setDragOver(null);
+
     const payload = readDragData(event);
     if (!payload) return;
 
@@ -148,8 +161,12 @@ export default function Teacher() {
       addDraft(tile, target);
     } else {
       if (payload.from === target) return;
-      const tile = room.draftHints[payload.from].find((item) => item.id === payload.tileId);
+
+      const tile = room.draftHints[payload.from].find(
+        (item) => item.id === payload.tileId
+      );
       if (!tile) return;
+
       removeDraft(payload.tileId, payload.from);
       room.draftHints[target].push(tile);
     }
@@ -158,38 +175,56 @@ export default function Teacher() {
   }
 
   function dropBackToPool(event: React.DragEvent) {
+    if (!room) return;
+
     event.preventDefault();
     setDragOver(null);
+
     const payload = readDragData(event);
     if (!payload || payload.source !== 'draft') return;
+
     removeDraft(payload.tileId, payload.from);
     saveRoom({ ...room });
   }
 
   function publishAll() {
-    if (draftCount === 0) {
+    if (!room) return;
+
+    const currentDraftCount = Object.values(room.draftHints).flat().length;
+    const isFirstPublish = Object.values(room.hints).flat().length === 0;
+
+    if (currentDraftCount === 0) {
       alert('공개할 힌트가 없습니다.');
       return;
     }
 
-    if (!firstPublish && draftCount !== 1) {
+    if (!isFirstPublish && currentDraftCount !== 1) {
       alert('추가 힌트는 정확히 1개만 공개할 수 있습니다.');
       return;
     }
 
-    if (firstPublish && draftCount !== 6) {
-      const ok = confirm(`처음 힌트는 보통 6개입니다. 현재 ${draftCount}개입니다. 그대로 공개할까요?`);
-      if (!ok) return;
+    if (isFirstPublish && currentDraftCount !== 6) {
+      const okay = confirm(
+        `처음 힌트는 보통 6개입니다. 현재 ${currentDraftCount}개입니다. 그대로 공개할까요?`
+      );
+      if (!okay) return;
     }
 
-    const ok = confirm('공개 후에는 수정할 수 없습니다. 학생에게 한 번에 공개할까요?');
-    if (!ok) return;
+    const okay = confirm(
+      '공개 후에는 수정할 수 없습니다. 학생에게 한 번에 공개할까요?'
+    );
+    if (!okay) return;
 
     (Object.keys(labels) as HintTarget[]).forEach((key) => {
       room.hints[key].push(...room.draftHints[key]);
     });
 
-    room.draftHints = { criminal: [], weapon: [], motive: [] };
+    room.draftHints = {
+      criminal: [],
+      weapon: [],
+      motive: []
+    };
+
     saveRoom({ ...room });
   }
 
@@ -238,12 +273,28 @@ export default function Teacher() {
         <section className="space-y-4">
           <article className="rounded-3xl border border-raven-gold/40 bg-raven-gold/10 p-5">
             <h2 className="text-2xl font-black">정답 및 후보 카드</h2>
+
             <div className="mt-4 grid grid-cols-3 gap-3">
-              <CandidatePanel title="범인 후보 9명" items={room.candidates.criminals} answer={room.answer.criminal} />
-              <CandidatePanel title="도구 후보 9개" items={room.candidates.weapons} answer={room.answer.weapon} />
-              <CandidatePanel title="동기 후보 9개" items={room.candidates.motives} answer={room.answer.motive} />
+              <CandidatePanel
+                title="범인 후보 9명"
+                items={room.candidates.criminals}
+                answer={room.answer.criminal}
+              />
+              <CandidatePanel
+                title="도구 후보 9개"
+                items={room.candidates.weapons}
+                answer={room.answer.weapon}
+              />
+              <CandidatePanel
+                title="동기 후보 9개"
+                items={room.candidates.motives}
+                answer={room.answer.motive}
+              />
             </div>
-            <p className="mt-3 text-sm text-white/60">노란색 테두리가 정답입니다. 교사 화면에만 표시됩니다.</p>
+
+            <p className="mt-3 text-sm text-white/60">
+              노란색 테두리가 정답입니다. 교사 화면에만 표시됩니다.
+            </p>
           </article>
 
           <article className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
@@ -254,6 +305,7 @@ export default function Teacher() {
                   타일을 드래그해 임시 배치하고, 공개 버튼을 누르면 학생에게 한 번에 공개됩니다.
                 </p>
               </div>
+
               <div className="rounded-xl bg-black/20 px-3 py-2 text-sm">
                 임시 배치 {draftCount}개
               </div>
@@ -266,17 +318,29 @@ export default function Teacher() {
               }}
               onDragLeave={() => setDragOver(null)}
               onDrop={dropBackToPool}
-              className={`mt-5 rounded-2xl border-2 border-dashed p-4 transition ${dragOver === 'pool' ? 'border-raven-gold bg-raven-gold/10' : 'border-white/20'}`}
+              className={`mt-5 rounded-2xl border-2 border-dashed p-4 transition ${
+                dragOver === 'pool'
+                  ? 'border-raven-gold bg-raven-gold/10'
+                  : 'border-white/20'
+              }`}
             >
               <h3 className="font-black">공개 타일 보드</h3>
-              <p className="mt-1 text-xs text-white/50">임시 힌트를 이 영역으로 다시 드롭하면 취소됩니다.</p>
+              <p className="mt-1 text-xs text-white/50">
+                임시 힌트를 이 영역으로 다시 드롭하면 취소됩니다.
+              </p>
+
               <div className="mt-3 flex flex-wrap gap-2">
                 {unusedTiles.map((tile) => (
                   <Chip
                     key={tile.id}
                     tile={tile}
                     draggable
-                    onDragStart={(event) => writeDragData(event, { source: 'pool', tileId: tile.id })}
+                    onDragStart={(event) =>
+                      writeDragData(event, {
+                        source: 'pool',
+                        tileId: tile.id
+                      })
+                    }
                   />
                 ))}
               </div>
@@ -292,7 +356,11 @@ export default function Teacher() {
                   }}
                   onDragLeave={() => setDragOver(null)}
                   onDrop={(event) => dropOnTarget(event, key)}
-                  className={`min-h-40 rounded-2xl border-2 border-dashed p-4 transition ${dragOver === key ? 'border-raven-gold bg-raven-gold/10' : 'border-white/20'}`}
+                  className={`min-h-40 rounded-2xl border-2 border-dashed p-4 transition ${
+                    dragOver === key
+                      ? 'border-raven-gold bg-raven-gold/10'
+                      : 'border-white/20'
+                  }`}
                 >
                   <h3 className="font-black">{labels[key]} 힌트</h3>
 
@@ -300,17 +368,26 @@ export default function Teacher() {
                     {room.hints[key].map((tile) => (
                       <div key={tile.id} className="relative">
                         <Chip tile={tile} />
-                        <span className="absolute -right-1 -top-2 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px]">🔒</span>
+                        <span className="absolute -right-1 -top-2 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px]">
+                          🔒
+                        </span>
                       </div>
                     ))}
 
                     {room.draftHints[key].map((tile) => (
-                      <div key={tile.id} className="rounded-xl ring-4 ring-raven-gold/40">
+                      <div
+                        key={tile.id}
+                        className="rounded-xl ring-4 ring-raven-gold/40"
+                      >
                         <Chip
                           tile={tile}
                           draggable
                           onDragStart={(event) =>
-                            writeDragData(event, { source: 'draft', tileId: tile.id, from: key })
+                            writeDragData(event, {
+                              source: 'draft',
+                              tileId: tile.id,
+                              from: key
+                            })
                           }
                         />
                       </div>
@@ -344,6 +421,7 @@ export default function Teacher() {
 
           <article className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
             <h2 className="text-2xl font-black">조 현황</h2>
+
             <div className="mt-3 space-y-2">
               {Object.values(room.teams).map((team) => (
                 <div key={team.name} className="rounded-2xl bg-white/10 p-3">
@@ -351,7 +429,9 @@ export default function Teacher() {
                     <b>{team.name}</b>
                     <span>{team.status}</span>
                   </div>
+
                   <p className="text-sm text-white/70">{team.notice}</p>
+
                   {team.pending && (
                     <button
                       type="button"
