@@ -63,6 +63,60 @@ function Chip({
   );
 }
 
+
+function ResultNotice({ team }: { team: Team }) {
+  const view = {
+    submitted: {
+      icon: '📨',
+      title: '제출 완료',
+      message: '교사의 판정을 기다리세요.',
+      cls: 'border-green-300/40 bg-green-500/15 text-green-50'
+    },
+    complete: {
+      icon: '🎉',
+      title: '제외 성공!',
+      message: '이번 라운드를 완료했습니다. 다음 라운드를 기다리세요.',
+      cls: 'border-blue-300/40 bg-blue-500/15 text-blue-50'
+    },
+    retry: {
+      icon: '💥',
+      title: '제외 실패',
+      message: '추리 타일 1개가 소모되었습니다. 같은 라운드에 다시 도전하세요.',
+      cls: 'border-red-300/40 bg-red-500/15 text-red-50'
+    },
+    success: {
+      icon: '🏆',
+      title: '사건 해결!',
+      message: '최종 추리에 성공했습니다.',
+      cls: 'border-raven-gold/50 bg-raven-gold/15 text-raven-gold'
+    },
+    gameover: {
+      icon: '☠',
+      title: 'GAME OVER',
+      message: '남은 추리 타일이 없습니다.',
+      cls: 'border-white/25 bg-black/30 text-white/80'
+    }
+  } as const;
+
+  const current = view[team.status as keyof typeof view];
+
+  if (!current) {
+    return team.notice ? (
+      <div className="mb-3 rounded-2xl border border-white/15 bg-white/10 p-3 text-center font-black">
+        {team.notice}
+      </div>
+    ) : null;
+  }
+
+  return (
+    <section className={`mb-3 rounded-2xl border p-4 text-center ${current.cls}`}>
+      <div className="text-3xl">{current.icon}</div>
+      <h2 className="mt-1 text-xl font-black">{current.title}</h2>
+      <p className="mt-1 text-sm font-bold opacity-90">{current.message}</p>
+    </section>
+  );
+}
+
 export default function Student() {
   const room = useRoom();
 
@@ -344,6 +398,19 @@ function StudentBoard({
           <span className="rounded-full border border-white/30 bg-black/20 px-6 py-3 font-black">
             ROUND {team.round}
           </span>
+          <span className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-black">
+            {team.status === 'thinking'
+              ? '추리 중'
+              : team.status === 'submitted'
+                ? '판정 대기'
+                : team.status === 'complete'
+                  ? '라운드 완료'
+                  : team.status === 'retry'
+                    ? '재도전'
+                    : team.status === 'success'
+                      ? '사건 해결'
+                      : 'GAME OVER'}
+          </span>
         </div>
 
         <div className="justify-self-end rounded-2xl bg-black/20 px-5 py-3">
@@ -351,11 +418,7 @@ function StudentBoard({
         </div>
       </header>
 
-      {team.notice && (
-        <div className="mb-3 rounded-2xl border border-raven-gold/40 bg-raven-gold/10 p-3 text-center font-black">
-          {team.notice}
-        </div>
-      )}
+      <ResultNotice team={team} />
 
       <div className="grid grid-cols-[1fr_320px] gap-4">
         <section className="grid grid-rows-3 gap-3">

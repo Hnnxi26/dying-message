@@ -79,9 +79,85 @@ function CandidatePanel({
   );
 }
 
+
+const statusView: Record<
+  string,
+  { label: string; icon: string; box: string; text: string }
+> = {
+  thinking: {
+    label: '생각 중',
+    icon: '🟡',
+    box: 'border-yellow-300/30 bg-yellow-400/10',
+    text: 'text-yellow-100'
+  },
+  submitted: {
+    label: '제출 완료',
+    icon: '🟢',
+    box: 'border-green-300/30 bg-green-400/10',
+    text: 'text-green-100'
+  },
+  complete: {
+    label: '라운드 완료',
+    icon: '🔵',
+    box: 'border-blue-300/30 bg-blue-400/10',
+    text: 'text-blue-100'
+  },
+  retry: {
+    label: '재도전',
+    icon: '🔴',
+    box: 'border-red-300/30 bg-red-400/10',
+    text: 'text-red-100'
+  },
+  success: {
+    label: '사건 해결',
+    icon: '⭐',
+    box: 'border-raven-gold/40 bg-raven-gold/10',
+    text: 'text-raven-gold'
+  },
+  gameover: {
+    label: 'GAME OVER',
+    icon: '☠',
+    box: 'border-white/20 bg-black/30',
+    text: 'text-white/70'
+  }
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const view = statusView[status] ?? statusView.thinking;
+
+  return (
+    <span className={`rounded-full border px-3 py-1 text-xs font-black ${view.box} ${view.text}`}>
+      {view.icon} {view.label}
+    </span>
+  );
+}
+
+function SubmittedCards({ cards }: { cards: string[] }) {
+  return (
+    <div className="mt-3">
+      <p className="text-xs font-bold text-white/50">제출한 제외 카드</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {cards.map((card) => (
+          <span
+            key={card}
+            className="rounded-lg border border-white/15 bg-black/20 px-2 py-1 text-xs font-bold"
+          >
+            {card}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Teacher() {
   const room = useRoom();
   const [dragOver, setDragOver] = useState<HintTarget | 'pool' | null>(null);
+  const [judgeResult, setJudgeResult] = useState<{
+    teamName: string;
+    success: boolean;
+    message: string;
+  } | null>(null);
   const url = typeof window === 'undefined' ? '' : `${window.location.origin}/student?room=${room?.code ?? ''}`;
 
   if (!room) {
@@ -424,23 +500,83 @@ export default function Teacher() {
             <div className="mt-3 space-y-2">
               {Object.values(room.teams).map((team) => (
                 <div key={team.name} className="rounded-2xl bg-white/10 p-3">
-                  <div className="flex justify-between">
-                    <b>{team.name}</b>
-                    <span>{team.status}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <b className="text-lg">{team.name}</b>
+                    <StatusBadge status={team.status} />
                   </div>
 
-                  <p className="text-sm text-white/70">{team.notice}</p>
+                  <p className="mt-2 text-sm text-white/70">{team.notice}</p>
+                  <div className="mt-2 flex gap-1">
+                    {team.guessTiles.map((alive, index) => (
+                      <span
+                        key={index}
+                        className={`grid h-7 w-7 place-items-center rounded-lg text-xs font-black ${
+                          alive ? 'bg-blue-600' : 'bg-red-600'
+                        }`}
+                      >
+                        {alive ? '✓' : '×'}
+                      </span>
+                    ))}
+                  </div>
 
-                  {team.pending && (
+                  {team.pending?.type === 'exclude' && (
+                    <>
+                      <SubmittedCards cards={team.pending.cards} />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const containsAnswer = team.pending?.type === 'exclude'
+                            ? team.pending.cards.some((card) =>
+                                [
+                                  room.answer.criminal,
+                                  room.answer.weapon,
+                                  room.answer.motive
+                                ].includes(card)
+                              )
+                            : false;
+
+                          resolveTeam(room, team.name);
+                          saveRoom({ ...room });
+
+                          setJudgeResult({
+                            teamName: team.name,
+                            success: !containsAnswer,
+                            message: containsAnswer
+                              ? '정답 카드가 포함되어 추리 타일 1개가 소모되었습니다.'
+                              : `ROUND ${team.round} 제외에 성공했습니다.`
+                          });
+                        }}
+                        className="mt-3 w-full rounded-xl bg-raven-gold px-3 py-2 font-black text-raven-bg"
+                      >
+                        판정하기
+                      </button>
+                    </>
+                  )}
+
+                  {team.pending?.type === 'final' && (
                     <button
                       type="button"
                       onClick={() => {
+                        const finalSuccess =
+                          team.pending?.type === 'final' &&
+                          team.pending.criminal === room.answer.criminal &&
+                          team.pending.weapon === room.answer.weapon &&
+                          team.pending.motive === room.answer.motive;
+
                         resolveTeam(room, team.name);
                         saveRoom({ ...room });
+
+                        setJudgeResult({
+                          teamName: team.name,
+                          success: Boolean(finalSuccess),
+                          message: finalSuccess
+                            ? '최종 추리에 성공해 사건을 해결했습니다.'
+                            : '최종 추리에 실패해 추리 타일 1개가 소모되었습니다.'
+                        });
                       }}
-                      className="mt-2 rounded-xl bg-raven-gold px-3 py-2 font-black text-raven-bg"
+                      className="mt-3 w-full rounded-xl bg-raven-gold px-3 py-2 font-black text-raven-bg"
                     >
-                      자동 판정
+                      최종 추리 판정
                     </button>
                   )}
                 </div>
@@ -449,6 +585,35 @@ export default function Teacher() {
           </article>
         </aside>
       </div>
-    </main>
+    
+      {judgeResult && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6">
+          <section
+            className={`w-full max-w-md rounded-3xl border p-7 text-center shadow-2xl ${
+              judgeResult.success
+                ? 'border-green-300/50 bg-[#173a28]'
+                : 'border-red-300/50 bg-[#471f2a]'
+            }`}
+          >
+            <div className="text-6xl">
+              {judgeResult.success ? '✅' : '❌'}
+            </div>
+            <h2 className="mt-4 text-3xl font-black">
+              {judgeResult.teamName}
+            </h2>
+            <p className="mt-3 text-lg font-bold">
+              {judgeResult.message}
+            </p>
+            <button
+              type="button"
+              onClick={() => setJudgeResult(null)}
+              className="mt-6 w-full rounded-2xl bg-white px-5 py-3 font-black text-black"
+            >
+              확인
+            </button>
+          </section>
+        </div>
+      )}
+</main>
   );
 }
