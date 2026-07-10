@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Category, Room, Team, createTeam } from '@/lib/localGame';
 import { saveRoom, useRoom } from '@/lib/localStore';
 
@@ -63,57 +63,44 @@ function Chip({
   );
 }
 
+type ResultModalData = {
+  kind: 'success' | 'failure' | 'final-success' | 'gameover';
+  title: string;
+  message: string;
+  icon: string;
+};
 
-function ResultNotice({ team }: { team: Team }) {
-  const view = {
-    submitted: {
-      icon: '📨',
-      title: '제출 완료',
-      message: '교사의 판정을 기다리세요.',
-      cls: 'border-green-300/40 bg-green-500/15 text-green-50'
-    },
-    complete: {
-      icon: '🎉',
-      title: '제외 성공!',
-      message: '이번 라운드를 완료했습니다. 다음 라운드를 기다리세요.',
-      cls: 'border-blue-300/40 bg-blue-500/15 text-blue-50'
-    },
-    retry: {
-      icon: '💥',
-      title: '제외 실패',
-      message: '추리 타일 1개가 소모되었습니다. 같은 라운드에 다시 도전하세요.',
-      cls: 'border-red-300/40 bg-red-500/15 text-red-50'
-    },
-    success: {
-      icon: '🏆',
-      title: '사건 해결!',
-      message: '최종 추리에 성공했습니다.',
-      cls: 'border-raven-gold/50 bg-raven-gold/15 text-raven-gold'
-    },
-    gameover: {
-      icon: '☠',
-      title: 'GAME OVER',
-      message: '남은 추리 타일이 없습니다.',
-      cls: 'border-white/25 bg-black/30 text-white/80'
-    }
-  } as const;
-
-  const current = view[team.status as keyof typeof view];
-
-  if (!current) {
-    return team.notice ? (
-      <div className="mb-3 rounded-2xl border border-white/15 bg-white/10 p-3 text-center font-black">
-        {team.notice}
-      </div>
-    ) : null;
-  }
+function ResultModal({
+  data,
+  onClose
+}: {
+  data: ResultModalData;
+  onClose: () => void;
+}) {
+  const success = data.kind === 'success' || data.kind === 'final-success';
 
   return (
-    <section className={`mb-3 rounded-2xl border p-4 text-center ${current.cls}`}>
-      <div className="text-3xl">{current.icon}</div>
-      <h2 className="mt-1 text-xl font-black">{current.title}</h2>
-      <p className="mt-1 text-sm font-bold opacity-90">{current.message}</p>
-    </section>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-6">
+      <section
+        className={`w-full max-w-xl rounded-3xl border p-8 text-center shadow-2xl ${
+          success
+            ? 'border-green-300/50 bg-[#173a28]'
+            : 'border-red-300/50 bg-[#471f2a]'
+        }`}
+      >
+        <div className="text-7xl">{data.icon}</div>
+        <h2 className="mt-5 text-4xl font-black">{data.title}</h2>
+        <p className="mt-4 text-lg font-bold text-white/90">{data.message}</p>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-7 w-full rounded-2xl bg-white px-5 py-4 text-lg font-black text-black"
+        >
+          확인
+        </button>
+      </section>
+    </div>
   );
 }
 
@@ -125,6 +112,8 @@ export default function Student() {
   const [teamName, setTeamName] = useState('');
   const [joinedTeamName, setJoinedTeamName] = useState('');
   const [error, setError] = useState('');
+  const [resultModal, setResultModal] = useState<ResultModalData | null>(null);
+  const previousStatusRef = useRef<string>('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -159,6 +148,50 @@ export default function Student() {
       }
     }
   }, [room]);
+
+  useEffect(() => {
+    if (!room || !joinedTeamName) return;
+
+    const currentTeam = room.teams[joinedTeamName];
+    if (!currentTeam) return;
+
+    const previousStatus = previousStatusRef.current;
+    const currentStatus = currentTeam.status;
+
+    if (previousStatus && previousStatus !== currentStatus) {
+      if (currentStatus === 'complete') {
+        setResultModal({
+          kind: 'success',
+          title: '제외 성공!',
+          message: `ROUND ${currentTeam.round} 제외에 성공했습니다. 다음 라운드를 기다려 주세요.`,
+          icon: '✅'
+        });
+      } else if (currentStatus === 'retry') {
+        setResultModal({
+          kind: 'failure',
+          title: '제외 실패',
+          message: '정답 카드가 포함되어 추리 타일 1개가 소모되었습니다. 다시 도전하세요.',
+          icon: '💥'
+        });
+      } else if (currentStatus === 'success') {
+        setResultModal({
+          kind: 'final-success',
+          title: '사건 해결!',
+          message: '최종 추리에 성공했습니다. 축하합니다!',
+          icon: '🏆'
+        });
+      } else if (currentStatus === 'gameover') {
+        setResultModal({
+          kind: 'gameover',
+          title: 'GAME OVER',
+          message: '남은 추리 타일이 없습니다.',
+          icon: '☠'
+        });
+      }
+    }
+
+    previousStatusRef.current = currentStatus;
+  }, [room, joinedTeamName]);
 
   if (!room) {
     return (
@@ -238,6 +271,9 @@ export default function Student() {
   }
 
   const team = joinedTeamName ? room.teams[joinedTeamName] : undefined;
+  if (team && !previousStatusRef.current) {
+    previousStatusRef.current = team.status;
+  }
 
   function joinTeam() {
     if (!room) return;
@@ -360,13 +396,22 @@ export default function Student() {
   }
 
   return (
-    <StudentBoard
-      room={room}
-      team={team}
-      toggle={toggleCard}
-      submit={submitExclusion}
-      final={submitFinal}
-    />
+    <>
+      <StudentBoard
+        room={room}
+        team={team}
+        toggle={toggleCard}
+        submit={submitExclusion}
+        final={submitFinal}
+      />
+
+      {resultModal && (
+        <ResultModal
+          data={resultModal}
+          onClose={() => setResultModal(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -398,19 +443,6 @@ function StudentBoard({
           <span className="rounded-full border border-white/30 bg-black/20 px-6 py-3 font-black">
             ROUND {team.round}
           </span>
-          <span className="rounded-full border border-white/20 bg-white/10 px-4 py-3 text-sm font-black">
-            {team.status === 'thinking'
-              ? '추리 중'
-              : team.status === 'submitted'
-                ? '판정 대기'
-                : team.status === 'complete'
-                  ? '라운드 완료'
-                  : team.status === 'retry'
-                    ? '재도전'
-                    : team.status === 'success'
-                      ? '사건 해결'
-                      : 'GAME OVER'}
-          </span>
         </div>
 
         <div className="justify-self-end rounded-2xl bg-black/20 px-5 py-3">
@@ -418,7 +450,11 @@ function StudentBoard({
         </div>
       </header>
 
-      <ResultNotice team={team} />
+      {team.notice && (
+        <div className="mb-3 rounded-2xl border border-raven-gold/40 bg-raven-gold/10 p-3 text-center font-black">
+          {team.notice}
+        </div>
+      )}
 
       <div className="grid grid-cols-[1fr_320px] gap-4">
         <section className="grid grid-rows-3 gap-3">
