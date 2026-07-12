@@ -303,7 +303,7 @@ export default function StudentPage() {
             <section className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
               <div className="flex justify-center gap-2">{team.guessTiles.map((alive, index) => <span key={index} className={`grid h-10 w-10 place-items-center rounded-xl ${alive ? 'bg-blue-600' : 'bg-red-600'}`}>{alive ? '✓' : '×'}</span>)}</div>
               {room.round < 4 ? (
-                <button type="button" disabled={team.selected.length !== 6 || team.status === 'submitted' || team.status === 'complete'} onClick={() => void submitExclusion()} className="mt-4 w-full rounded-2xl bg-raven-gold p-3 font-black text-raven-bg disabled:opacity-40">제외 제출</button>
+                <button type="button" disabled={team.selected.length !== 6 || team.status === 'complete'} onClick={() => void submitExclusion()} className="mt-4 w-full rounded-2xl bg-raven-gold p-3 font-black text-raven-bg disabled:opacity-40">제외 제출</button>
               ) : (
                 <FinalGuess room={room} team={team} onSubmit={(c, w, m) => void submitFinal(c, w, m)} />
               )}
