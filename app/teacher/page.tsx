@@ -15,6 +15,17 @@ import {
 } from '@/lib/roomStore';
 import { firebaseReady } from '@/lib/firebase/client';
 
+
+function compareTeamNames(
+  a: { name: string },
+  b: { name: string }
+): number {
+  return a.name.localeCompare(b.name, 'ko', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+}
+
 export default function TeacherPage() {
   const [roomCode, setRoomCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,7 +47,9 @@ export default function TeacherPage() {
   const pendingTeams = useMemo(
     () =>
       room
-        ? Object.values(room.teams).filter((team) => Boolean(team.pending))
+        ? Object.values(room.teams)
+            .filter((team) => Boolean(team.pending))
+            .sort(compareTeamNames)
         : [],
     [room]
   );
@@ -44,7 +57,9 @@ export default function TeacherPage() {
   const otherTeams = useMemo(
     () =>
       room
-        ? Object.values(room.teams).filter((team) => !team.pending)
+        ? Object.values(room.teams)
+            .filter((team) => !team.pending)
+            .sort(compareTeamNames)
         : [],
     [room]
   );

@@ -66,6 +66,17 @@ function TeamCard({
   );
 }
 
+
+function compareTeamNames(
+  a: { name: string },
+  b: { name: string }
+): number {
+  return a.name.localeCompare(b.name, 'ko', {
+    numeric: true,
+    sensitivity: 'base'
+  });
+}
+
 export default function ProjectorPage() {
   const [code, setCode] = useState('');
   const [inputCode, setInputCode] = useState('');
@@ -93,7 +104,10 @@ export default function ProjectorPage() {
   const { room, loading, error } = useRemoteRoom(code);
 
   const teams = useMemo(
-    () => (room ? Object.values(room.teams) : []),
+    () =>
+      room
+        ? Object.values(room.teams).sort(compareTeamNames)
+        : [],
     [room]
   );
 
