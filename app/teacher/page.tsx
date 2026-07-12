@@ -121,6 +121,20 @@ export default function TeacherPage() {
         <div className="flex gap-2">
           <button
             type="button"
+            onClick={() =>
+              window.open(
+                `/projector?room=${encodeURIComponent(room.code)}`,
+                '_blank',
+                'noopener,noreferrer'
+              )
+            }
+            className="rounded-xl border border-raven-gold/50 bg-raven-gold/10 px-4 py-2 font-black text-raven-gold"
+          >
+            프로젝터 열기
+          </button>
+
+          <button
+            type="button"
             className="rounded-xl border px-4 py-2"
             onClick={async () => {
               if (!confirm('현재 방을 삭제하고 초기화할까요?')) return;
