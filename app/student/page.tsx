@@ -59,10 +59,12 @@ export default function StudentPage() {
     setBusy(true);
     try {
       const found = await getRemoteRoom(normalized);
+
       if (!found) {
-        if (showError) setError('잘못된 방 코드입니다.');
+        if (showError) setError('존재하지 않는 방입니다.');
         return;
       }
+
       localStorage.setItem('verifiedRoomCode', normalized);
       setVerifiedCode(normalized);
       setRoomCode(normalized);
@@ -71,6 +73,14 @@ export default function StudentPage() {
       const savedTeam = localStorage.getItem('teamName') || '';
       if (savedTeam && found.teams[savedTeam]) {
         setJoinedTeamName(savedTeam);
+      }
+    } catch (cause) {
+      if (showError) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : '방을 확인하지 못했습니다.'
+        );
       }
     } finally {
       setBusy(false);
@@ -109,15 +119,37 @@ export default function StudentPage() {
 
   async function joinTeam() {
     if (!room) return;
+
     const normalized = teamName.trim();
     if (!normalized || busy) return;
+
+    const savedTeam = localStorage.getItem('teamName') || '';
+
     setBusy(true);
+    setError('');
+
     try {
       await mutateRoom(room.code, (draft) => {
-        if (!draft.teams[normalized]) draft.teams[normalized] = createTeam(normalized, draft.round);
+        const existingTeam = draft.teams[normalized];
+
+        if (existingTeam && savedTeam !== normalized) {
+          throw new Error('이미 사용 중인 조 이름입니다.');
+        }
+
+        if (!existingTeam) {
+          draft.teams[normalized] = createTeam(normalized, draft.round);
+        }
       });
+
       localStorage.setItem('teamName', normalized);
+      localStorage.setItem('verifiedRoomCode', room.code);
       setJoinedTeamName(normalized);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : '조 입장에 실패했습니다.'
+      );
     } finally {
       setBusy(false);
     }
@@ -129,8 +161,49 @@ export default function StudentPage() {
         <section className="w-full max-w-md rounded-3xl border border-white/15 bg-raven-panel/90 p-8">
           <div className="rounded-xl bg-raven-gold/15 p-3 text-center text-raven-gold">방 코드 확인 완료: <b>{room.code}</b></div>
           <h1 className="mt-5 text-4xl font-black">조 이름 입력</h1>
-          <input value={teamName} onChange={(e) => setTeamName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void joinTeam(); }} placeholder="예: 3조" className="mt-6 w-full rounded-2xl border border-white/20 bg-black/20 p-3" />
-          <button type="button" disabled={busy} onClick={() => void joinTeam()} className="mt-4 w-full rounded-2xl bg-raven-gold p-3 font-black text-raven-bg disabled:opacity-50">입장하기</button>
+          <input
+            value={teamName}
+            onChange={(e) => {
+              setTeamName(e.target.value);
+              setError('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void joinTeam();
+            }}
+            placeholder="예: 3조"
+            className="mt-6 w-full rounded-2xl border border-white/20 bg-black/20 p-3"
+          />
+
+          {error && (
+            <p className="mt-3 rounded-xl bg-red-500/20 p-3 text-center font-bold text-red-100">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void joinTeam()}
+            className="mt-4 w-full rounded-2xl bg-raven-gold p-3 font-black text-raven-bg disabled:opacity-50"
+          >
+            {busy ? '입장 중...' : '입장하기'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('teamName');
+              localStorage.removeItem('verifiedRoomCode');
+              setJoinedTeamName('');
+              setVerifiedCode('');
+              setTeamName('');
+              setRoomCode('');
+              setError('');
+            }}
+            className="mt-3 w-full rounded-xl border border-white/20 p-2 text-sm text-white/60"
+          >
+            다른 방 또는 조로 입장
+          </button>
         </section>
       </main>
     );
