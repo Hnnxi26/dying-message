@@ -188,23 +188,60 @@ export default function StudentPage() {
           >
             {busy ? '입장 중...' : '입장하기'}
           </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.removeItem('teamName');
-              localStorage.removeItem('verifiedRoomCode');
-              setJoinedTeamName('');
-              setVerifiedCode('');
-              setTeamName('');
-              setRoomCode('');
-              setError('');
-            }}
-            className="mt-3 w-full rounded-xl border border-white/20 p-2 text-sm text-white/60"
-          >
-            다른 방 또는 조로 입장
-          </button>
         </section>
+      </main>
+    );
+  }
+
+  if (team.status === 'submitted') {
+    return (
+      <main className="grid min-h-screen place-items-center p-8">
+        <section className="w-full max-w-xl rounded-3xl border border-raven-gold/40 bg-raven-panel/95 p-10 text-center shadow-2xl">
+          <div className="text-7xl">⏳</div>
+          <h1 className="mt-5 text-4xl font-black">제출 완료</h1>
+          <p className="mt-4 text-lg font-bold text-white/80">
+            교사의 판정을 기다리는 중입니다.
+          </p>
+          <p className="mt-2 text-sm text-white/50">
+            판정 결과는 이 화면에 자동으로 표시됩니다.
+          </p>
+
+          <div className="mt-7 rounded-2xl bg-black/20 p-4">
+            <div className="flex items-center justify-center gap-3">
+              <span className="rounded-full border border-white/20 px-4 py-2 font-black">
+                {team.name}
+              </span>
+              <span className="rounded-full border border-white/20 px-4 py-2 font-black">
+                ROUND {team.round}
+              </span>
+            </div>
+
+            {team.pending?.type === 'exclude' && (
+              <div className="mt-5">
+                <p className="text-sm font-bold text-white/50">
+                  제출한 제외 카드
+                </p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {team.pending.cards.map((card) => (
+                    <span
+                      key={card}
+                      className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-black"
+                    >
+                      {card}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {resultModal && (
+          <ResultModal
+            data={resultModal}
+            onClose={() => setResultModal(null)}
+          />
+        )}
       </main>
     );
   }

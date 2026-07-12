@@ -11,15 +11,23 @@ const statusView: Record<string, { label: string; icon: string; cls: string }> =
 
 export function TeamStatusCard({
   team,
-  onJudge
+  onJudge,
+  emphasized = false
 }: {
   team: Team;
   onJudge: () => void;
+  emphasized?: boolean;
 }) {
   const view = statusView[team.status] ?? statusView.thinking;
 
   return (
-    <div className="rounded-2xl bg-white/10 p-3">
+    <div
+      className={`rounded-2xl border p-3 transition ${
+        emphasized
+          ? 'border-raven-gold/60 bg-black/25 shadow-lg shadow-raven-gold/10'
+          : 'border-transparent bg-white/10'
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <b className="text-lg">{team.name}</b>
         <span className={`rounded-full border px-3 py-1 text-xs font-black ${view.cls}`}>

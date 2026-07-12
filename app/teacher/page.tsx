@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { CandidatePanel } from '@/components/teacher/CandidatePanel';
 import { HintEditor } from '@/components/teacher/HintEditor';
@@ -18,6 +18,8 @@ import { firebaseReady } from '@/lib/firebase/client';
 export default function TeacherPage() {
   const [roomCode, setRoomCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const pendingSectionRef = useRef<HTMLElement | null>(null);
+  const previousPendingCountRef = useRef(0);
   const { room, loading, error } = useRemoteRoom(roomCode);
 
   useEffect(() => {
@@ -28,6 +30,38 @@ export default function TeacherPage() {
     typeof window === 'undefined' || !room
       ? ''
       : `${window.location.origin}/student?room=${room.code}`;
+
+  const pendingTeams = useMemo(
+    () =>
+      room
+        ? Object.values(room.teams).filter((team) => Boolean(team.pending))
+        : [],
+    [room]
+  );
+
+  const otherTeams = useMemo(
+    () =>
+      room
+        ? Object.values(room.teams).filter((team) => !team.pending)
+        : [],
+    [room]
+  );
+
+  useEffect(() => {
+    const currentCount = pendingTeams.length;
+
+    if (
+      currentCount > previousPendingCountRef.current &&
+      pendingSectionRef.current
+    ) {
+      pendingSectionRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+
+    previousPendingCountRef.current = currentCount;
+  }, [pendingTeams.length]);
 
   async function createNewRoom() {
     setBusy(true);
@@ -139,24 +173,75 @@ export default function TeacherPage() {
             <p className="mt-2 break-all text-xs text-white/50">{studentUrl}</p>
           </article>
 
-          <article className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
-            <h2 className="text-2xl font-black">조 현황</h2>
-            <div className="mt-3 space-y-2">
-              {Object.values(room.teams).map((team) => (
-                <TeamStatusCard
-                  key={team.name}
-                  team={team}
-                  onJudge={async () => {
-                    setBusy(true);
-                    try {
-                      await mutateRoom(room.code, (draft) => resolveTeam(draft, team.name));
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                />
-              ))}
+          <section
+            ref={pendingSectionRef}
+            className={`rounded-3xl border p-5 transition ${
+              pendingTeams.length > 0
+                ? 'animate-pulse border-raven-gold/60 bg-raven-gold/10'
+                : 'border-white/15 bg-raven-panel/90'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-black">🔔 판정 대기</h2>
+              <span className="rounded-full bg-raven-gold px-3 py-1 text-sm font-black text-raven-bg">
+                {pendingTeams.length}
+              </span>
             </div>
+
+            {pendingTeams.length === 0 ? (
+              <p className="mt-3 text-sm text-white/50">
+                아직 제출된 조가 없습니다.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {pendingTeams.map((team) => (
+                  <TeamStatusCard
+                    key={team.name}
+                    team={team}
+                    emphasized
+                    onJudge={async () => {
+                      setBusy(true);
+                      try {
+                        await mutateRoom(room.code, (draft) =>
+                          resolveTeam(draft, team.name)
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <article className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
+            <h2 className="text-2xl font-black">전체 조 현황</h2>
+
+            {Object.values(room.teams).length === 0 ? (
+              <p className="mt-3 text-sm text-white/50">
+                학생 조의 입장을 기다리고 있습니다.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {otherTeams.map((team) => (
+                  <TeamStatusCard
+                    key={team.name}
+                    team={team}
+                    onJudge={async () => {
+                      setBusy(true);
+                      try {
+                        await mutateRoom(room.code, (draft) =>
+                          resolveTeam(draft, team.name)
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </article>
         </aside>
       </div>
