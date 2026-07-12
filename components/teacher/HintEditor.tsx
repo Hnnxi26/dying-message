@@ -19,7 +19,8 @@ export function HintEditor({ room }: { room: Room }) {
     writeDragData,
     dropOnTarget,
     dropBackToPool,
-    publishAll
+    publishAll,
+    busy
   } = useHintDraft(room);
 
   return (
@@ -117,7 +118,7 @@ export function HintEditor({ room }: { room: Room }) {
 
       <button
         type="button"
-        disabled={draftCount === 0}
+        disabled={draftCount === 0 || busy}
         onClick={publishAll}
         className="mt-5 w-full rounded-2xl bg-raven-gold px-5 py-4 text-lg font-black text-raven-bg disabled:opacity-40"
       >

@@ -1,32 +1,76 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { CandidatePanel } from '@/components/teacher/CandidatePanel';
 import { HintEditor } from '@/components/teacher/HintEditor';
 import { TeamStatusCard } from '@/components/teacher/TeamStatusCard';
 import { canNext, createRoom, nextRound, resolveTeam } from '@/lib/localGame';
-import { clearRoom, saveRoom, useRoom } from '@/lib/localStore';
+import {
+  createRemoteRoom,
+  deleteRemoteRoom,
+  getSavedTeacherRoomCode,
+  mutateRoom,
+  useRemoteRoom
+} from '@/lib/roomStore';
+import { firebaseReady } from '@/lib/firebase/client';
 
 export default function TeacherPage() {
-  const room = useRoom();
+  const [roomCode, setRoomCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const { room, loading, error } = useRemoteRoom(roomCode);
+
+  useEffect(() => {
+    setRoomCode(getSavedTeacherRoomCode());
+  }, []);
+
   const studentUrl =
-    typeof window === 'undefined'
+    typeof window === 'undefined' || !room
       ? ''
-      : `${window.location.origin}/student?room=${room?.code ?? ''}`;
+      : `${window.location.origin}/student?room=${room.code}`;
+
+  async function createNewRoom() {
+    setBusy(true);
+    try {
+      const created = createRoom();
+      await createRemoteRoom(created);
+      setRoomCode(created.code);
+    } catch (cause) {
+      alert(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!firebaseReady) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-8">
+        <section className="w-full max-w-xl rounded-3xl bg-raven-panel/90 p-8">
+          Firebase 환경변수가 없습니다. Vercel 환경변수를 확인하세요.
+        </section>
+      </main>
+    );
+  }
+
+  if (loading) {
+    return <main className="grid min-h-screen place-items-center text-2xl font-black">방 불러오는 중...</main>;
+  }
 
   if (!room) {
     return (
       <main className="flex min-h-screen items-center justify-center p-8">
         <section className="w-full max-w-xl rounded-3xl border border-white/15 bg-raven-panel/90 p-8">
           <h1 className="text-4xl font-black">Teacher Dashboard</h1>
+          {error && <p className="mt-4 rounded-xl bg-red-500/20 p-3 text-red-100">{error}</p>}
           <button
             type="button"
-            className="mt-6 rounded-2xl bg-raven-gold px-6 py-4 font-black text-raven-bg"
-            onClick={() => saveRoom(createRoom())}
+            disabled={busy}
+            className="mt-6 rounded-2xl bg-raven-gold px-6 py-4 font-black text-raven-bg disabled:opacity-50"
+            onClick={createNewRoom}
           >
-            방 만들기
+            {busy ? '방 만드는 중...' : '방 만들기'}
           </button>
-          <p className="mt-5 text-white/60">v0.8 리팩터링 버전</p>
+          <p className="mt-5 text-white/60">화요일 시연용 실시간 버전</p>
         </section>
       </main>
     );
@@ -37,18 +81,17 @@ export default function TeacherPage() {
       <header className="mb-4 flex justify-between">
         <div>
           <h1 className="text-4xl font-black">Teacher Dashboard</h1>
-          <p className="text-white/60">
-            방 코드 {room.code} · ROUND {room.round}
-          </p>
+          <p className="text-white/60">방 코드 {room.code} · ROUND {room.round}</p>
         </div>
 
         <div className="flex gap-2">
           <button
             type="button"
             className="rounded-xl border px-4 py-2"
-            onClick={() => {
-              clearRoom();
-              location.reload();
+            onClick={async () => {
+              if (!confirm('현재 방을 삭제하고 초기화할까요?')) return;
+              await deleteRemoteRoom(room.code);
+              setRoomCode('');
             }}
           >
             초기화
@@ -56,10 +99,14 @@ export default function TeacherPage() {
 
           <button
             type="button"
-            disabled={!canNext(room) || room.round >= 4}
-            onClick={() => {
-              nextRound(room);
-              saveRoom({ ...room });
+            disabled={!canNext(room) || room.round >= 4 || busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await mutateRoom(room.code, nextRound);
+              } finally {
+                setBusy(false);
+              }
             }}
             className="rounded-2xl bg-raven-gold px-5 py-3 font-black text-raven-bg disabled:opacity-40"
           >
@@ -73,21 +120,9 @@ export default function TeacherPage() {
           <article className="rounded-3xl border border-raven-gold/40 bg-raven-gold/10 p-5">
             <h2 className="text-2xl font-black">정답 및 후보 카드</h2>
             <div className="mt-4 grid grid-cols-3 gap-3">
-              <CandidatePanel
-                title="범인 후보 9명"
-                items={room.candidates.criminals}
-                answer={room.answer.criminal}
-              />
-              <CandidatePanel
-                title="도구 후보 9개"
-                items={room.candidates.weapons}
-                answer={room.answer.weapon}
-              />
-              <CandidatePanel
-                title="동기 후보 9개"
-                items={room.candidates.motives}
-                answer={room.answer.motive}
-              />
+              <CandidatePanel title="범인 후보 9명" items={room.candidates.criminals} answer={room.answer.criminal} />
+              <CandidatePanel title="도구 후보 9개" items={room.candidates.weapons} answer={room.answer.weapon} />
+              <CandidatePanel title="동기 후보 9개" items={room.candidates.motives} answer={room.answer.motive} />
             </div>
           </article>
 
@@ -100,7 +135,8 @@ export default function TeacherPage() {
             <div className="mt-3 w-fit rounded-2xl bg-white p-4">
               <QRCodeSVG value={studentUrl} size={170} />
             </div>
-            <p className="mt-3 break-all text-sm text-white/60">{studentUrl}</p>
+            <p className="mt-3 text-center text-3xl font-black tracking-widest text-raven-gold">{room.code}</p>
+            <p className="mt-2 break-all text-xs text-white/50">{studentUrl}</p>
           </article>
 
           <article className="rounded-3xl border border-white/15 bg-raven-panel/90 p-5">
@@ -110,9 +146,13 @@ export default function TeacherPage() {
                 <TeamStatusCard
                   key={team.name}
                   team={team}
-                  onJudge={() => {
-                    resolveTeam(room, team.name);
-                    saveRoom({ ...room });
+                  onJudge={async () => {
+                    setBusy(true);
+                    try {
+                      await mutateRoom(room.code, (draft) => resolveTeam(draft, team.name));
+                    } finally {
+                      setBusy(false);
+                    }
                   }}
                 />
               ))}
