@@ -6,7 +6,7 @@ import { FinalGuess } from '@/components/student/FinalGuess';
 import { HintNotebook } from '@/components/student/HintNotebook';
 import { ResultModal, type ResultModalData } from '@/components/student/ResultModal';
 import type { Category } from '@/lib/localGame';
-import { createTeam } from '@/lib/localGame';
+import { createTeam, getRoomPhase } from '@/lib/localGame';
 import { getRemoteRoom, mutateRoom, useRemoteRoom } from '@/lib/roomStore';
 
 export default function StudentPage() {
@@ -17,6 +17,7 @@ export default function StudentPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [resultModal, setResultModal] = useState<ResultModalData | null>(null);
+  const [now, setNow] = useState(Date.now());
   const previousStatusRef = useRef('');
   const { room, loading } = useRemoteRoom(verifiedCode);
 
@@ -30,6 +31,11 @@ export default function StudentPage() {
     setRoomCode(initialCode);
     setTeamName(savedTeam);
     if (initialCode) void verifyCode(initialCode, false);
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 200);
+    return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -188,6 +194,55 @@ export default function StudentPage() {
           >
             {busy ? '입장 중...' : '입장하기'}
           </button>
+        </section>
+      </main>
+    );
+  }
+
+  const roomPhase = getRoomPhase(room);
+
+  if (roomPhase !== 'playing') {
+    const countdownLeft =
+      room.countdownEndsAt
+        ? Math.max(0, Math.ceil((room.countdownEndsAt - now) / 1000))
+        : 0;
+
+    return (
+      <main className="grid min-h-screen place-items-center p-8">
+        <section className="w-full max-w-2xl rounded-3xl border border-white/15 bg-raven-panel/95 p-10 text-center shadow-2xl">
+          {roomPhase === 'countdown' ? (
+            <>
+              <p className="text-2xl font-black text-raven-gold">
+                ROUND {room.round}
+              </p>
+              <div className="mt-5 text-[10rem] font-black leading-none">
+                {countdownLeft > 0 ? countdownLeft : 'START'}
+              </div>
+              <p className="mt-6 text-xl font-bold text-white/70">
+                수사 시작을 준비하세요.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="text-7xl">🕵️</div>
+              <h1 className="mt-5 text-4xl font-black">
+                {roomPhase === 'briefing'
+                  ? '사건 브리핑이 진행 중입니다.'
+                  : '교사의 시작을 기다리는 중입니다.'}
+              </h1>
+              <p className="mt-5 text-xl font-bold text-white/70">
+                프로젝터를 봐 주세요.
+              </p>
+              <div className="mt-7 flex justify-center gap-3">
+                <span className="rounded-full border border-white/20 px-5 py-3 font-black">
+                  {team.name}
+                </span>
+                <span className="rounded-full border border-white/20 px-5 py-3 font-black">
+                  방 코드 {room.code}
+                </span>
+              </div>
+            </>
+          )}
         </section>
       </main>
     );

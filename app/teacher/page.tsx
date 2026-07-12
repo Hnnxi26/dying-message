@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { CandidatePanel } from '@/components/teacher/CandidatePanel';
 import { HintEditor } from '@/components/teacher/HintEditor';
 import { TeamStatusCard } from '@/components/teacher/TeamStatusCard';
-import { canNext, createRoom, nextRound, resolveTeam } from '@/lib/localGame';
+import { canNext, createRoom, getRoomPhase, nextRound, resolveTeam, startBriefing, startCountdown } from '@/lib/localGame';
 import {
   createRemoteRoom,
   deleteRemoteRoom,
@@ -30,6 +30,8 @@ export default function TeacherPage() {
     typeof window === 'undefined' || !room
       ? ''
       : `${window.location.origin}/student?room=${room.code}`;
+
+  const currentPhase = room ? getRoomPhase(room) : 'lobby';
 
   const pendingTeams = useMemo(
     () =>
@@ -115,10 +117,56 @@ export default function TeacherPage() {
       <header className="mb-4 flex justify-between">
         <div>
           <h1 className="text-4xl font-black">Teacher Dashboard</h1>
-          <p className="text-white/60">방 코드 {room.code} · ROUND {room.round}</p>
+          <p className="text-white/60">
+            방 코드 {room.code} · ROUND {room.round} · {
+              currentPhase === 'lobby'
+                ? '입장 대기'
+                : currentPhase === 'briefing'
+                  ? '사건 브리핑'
+                  : currentPhase === 'countdown'
+                    ? '시작 카운트다운'
+                    : '수사 진행'
+            }
+          </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {currentPhase === 'lobby' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await mutateRoom(room.code, startBriefing);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="rounded-xl bg-purple-500 px-4 py-2 font-black text-white disabled:opacity-50"
+            >
+              사건 브리핑 시작
+            </button>
+          )}
+
+          {currentPhase === 'briefing' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await mutateRoom(room.code, (draft) => startCountdown(draft));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="rounded-xl bg-green-500 px-4 py-2 font-black text-white disabled:opacity-50"
+            >
+              수사 시작
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() =>
@@ -151,7 +199,10 @@ export default function TeacherPage() {
             onClick={async () => {
               setBusy(true);
               try {
-                await mutateRoom(room.code, nextRound);
+                await mutateRoom(room.code, (draft) => {
+                  nextRound(draft);
+                  startCountdown(draft);
+                });
               } finally {
                 setBusy(false);
               }

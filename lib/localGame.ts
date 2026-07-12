@@ -1,8 +1,25 @@
 export type Category='criminals'|'weapons'|'motives';
 export type HintTarget='criminal'|'weapon'|'motive';
 export type Tile={id:string;word:string;type:'adjective'|'noun'};
+export type GamePhase='lobby'|'briefing'|'countdown'|'playing';
 export type Team={name:string;round:number;status:'thinking'|'submitted'|'complete'|'retry'|'success'|'gameover';guessTiles:boolean[];selected:string[];excluded:Record<Category,string[]>;pending?:{type:'exclude';cards:string[]}|{type:'final';criminal:string;weapon:string;motive:string};notice:string};
-export type Room={code:string;round:number;candidates:Record<Category,string[]>;answer:{criminal:string;weapon:string;motive:string};openTiles:Tile[];hints:Record<HintTarget,Tile[]>;draftHints:Record<HintTarget,Tile[]>;teams:Record<string,Team>};
+export type Room={
+  code:string;
+  round:number;
+  phase?:GamePhase;
+  countdownEndsAt?:number;
+  caseFile?:{
+    number:string;
+    title:string;
+    briefing:string[];
+  };
+  candidates:Record<Category,string[]>;
+  answer:{criminal:string;weapon:string;motive:string};
+  openTiles:Tile[];
+  hints:Record<HintTarget,Tile[]>;
+  draftHints:Record<HintTarget,Tile[]>;
+  teams:Record<string,Team>;
+};
 
 export const criminals=['모델','음악가','바텐더','요리사','경찰','과학자','복서','마약상','시민','영화감독','건축가','미용사','의사','사기꾼','가수','군인','화가','야구선수','신문기자','아이돌','살인마','변호사','경호원'];
 export const weapons=['하이힐','독버섯','망치','폭탄','케이블','넥타이','손도끼','트로피','벽돌','줄넘기','화분','가방','휴지통','곰인형','세탁기','냉장고','변기','코트','쇼핑백','베개','가위','권총','식칼'];
@@ -14,7 +31,31 @@ const s=<T,>(a:T[],n:number)=>{const c=[...a],r:T[]=[];while(r.length<n&&c.lengt
 const p=<T,>(a:T[])=>a[Math.floor(Math.random()*a.length)];
 const tile=(word:string,type:'adjective'|'noun'):Tile=>({id:`${type}-${word}`,word,type});
 
-export function createRoom():Room{const cs=s(criminals,9),ws=s(weapons,9);return{code:Math.random().toString(36).slice(2,8).toUpperCase(),round:1,candidates:{criminals:cs,weapons:ws,motives},answer:{criminal:p(cs),weapon:p(ws),motive:p(motives)},openTiles:[...s(adjectives,6).map(w=>tile(w,'adjective')),...s(nouns,6).map(w=>tile(w,'noun'))],hints:{criminal:[],weapon:[],motive:[]},draftHints:{criminal:[],weapon:[],motive:[]},teams:{}}}
+export function createRoom():Room{
+  const cs=s(criminals,9),ws=s(weapons,9);
+  return{
+    code:Math.random().toString(36).slice(2,8).toUpperCase(),
+    round:1,
+    phase:'lobby',
+    caseFile:{
+      number:'001',
+      title:'죽어가는 소설가',
+      briefing:[
+        '유명 소설가가 자신의 서재에서 숨진 채 발견되었습니다.',
+        '현장에는 정체를 알 수 없는 메모가 남아 있습니다.',
+        '범인은 거짓 단서를 흘리고 있습니다.',
+        '여러분은 형사입니다.',
+        '사건을 해결하십시오.'
+      ]
+    },
+    candidates:{criminals:cs,weapons:ws,motives},
+    answer:{criminal:p(cs),weapon:p(ws),motive:p(motives)},
+    openTiles:[...s(adjectives,6).map(w=>tile(w,'adjective')),...s(nouns,6).map(w=>tile(w,'noun'))],
+    hints:{criminal:[],weapon:[],motive:[]},
+    draftHints:{criminal:[],weapon:[],motive:[]},
+    teams:{}
+  }
+}
 export function ensureDraftHints(r:Room){if(!r.draftHints)r.draftHints={criminal:[],weapon:[],motive:[]}}
 export function createTeam(name:string,round:number):Team{return{name,round,status:'thinking',guessTiles:[true,true,true,true],selected:[],excluded:{criminals:[],weapons:[],motives:[]},notice:'수사 시작'}}
 export function categoryOf(r:Room,c:string):Category{if(r.candidates.criminals.includes(c))return'criminals';if(r.candidates.weapons.includes(c))return'weapons';return'motives'}
@@ -24,3 +65,27 @@ export function addRoundTiles(r:Room){const words=r.openTiles.map(t=>t.word);con
 export function resolveTeam(r:Room,name:string){const t=r.teams[name];if(!t?.pending)return;if(t.pending.type==='exclude'){const ans=[r.answer.criminal,r.answer.weapon,r.answer.motive];const fail=t.pending.cards.some(c=>ans.includes(c));if(fail){const i=t.guessTiles.findIndex(Boolean);if(i>=0)t.guessTiles[i]=false;t.status=t.guessTiles.some(Boolean)?'retry':'gameover';t.notice=t.status==='retry'?`제외 실패: ROUND ${t.round} 재도전`:'GAME OVER'}else{for(const c of t.pending.cards){const cat=categoryOf(r,c);if(!t.excluded[cat].includes(c))t.excluded[cat].push(c)}t.status='complete';t.notice=`제외 성공: ROUND ${t.round} 완료`}t.selected=[];t.pending=undefined;return}const q=t.pending;const ok=q.criminal===r.answer.criminal&&q.weapon===r.answer.weapon&&q.motive===r.answer.motive;if(ok){t.status='success';t.notice='최종 추리 성공!'}else{const i=t.guessTiles.findIndex(Boolean);if(i>=0)t.guessTiles[i]=false;t.status=t.guessTiles.some(Boolean)?'thinking':'gameover';t.notice=t.status==='thinking'?'최종 추리 실패: 다시 시도':'GAME OVER'}t.pending=undefined}
 export function canNext(r:Room){const alive=Object.values(r.teams).filter(t=>t.status!=='gameover');return alive.length>0&&alive.every(t=>t.status==='complete'||t.status==='success')}
 export function nextRound(r:Room){r.round=Math.min(4,r.round+1);if(r.round===2||r.round===3)addRoundTiles(r);ensureDraftHints(r);r.draftHints={criminal:[],weapon:[],motive:[]};Object.values(r.teams).forEach(t=>{if(t.status!=='gameover'&&t.status!=='success'){t.round=r.round;t.status='thinking';t.selected=[];t.notice=r.round===4?'최종 추리를 진행하세요.':`ROUND ${r.round} 시작`}})}
+
+
+export function getRoomPhase(room:Room):GamePhase{
+  const phase=room.phase??'playing';
+  if(phase==='countdown'&&room.countdownEndsAt&&Date.now()>=room.countdownEndsAt){
+    return'playing';
+  }
+  return phase;
+}
+
+export function startBriefing(room:Room){
+  room.phase='briefing';
+  room.countdownEndsAt=undefined;
+}
+
+export function startCountdown(room:Room,durationMs=4000){
+  room.phase='countdown';
+  room.countdownEndsAt=Date.now()+durationMs;
+  Object.values(room.teams).forEach(team=>{
+    if(team.status!=='gameover'&&team.status!=='success'){
+      team.notice=`ROUND ${room.round} 시작 대기`;
+    }
+  });
+}

@@ -7,6 +7,7 @@ import {
   getSavedTeacherRoomCode,
   useRemoteRoom
 } from '@/lib/roomStore';
+import { getRoomPhase } from '@/lib/localGame';
 
 const statusView: Record<
   string,
@@ -70,6 +71,12 @@ export default function ProjectorPage() {
   const [inputCode, setInputCode] = useState('');
   const [entryError, setEntryError] = useState('');
   const [checking, setChecking] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 200);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -185,6 +192,109 @@ export default function ProjectorPage() {
           <h1 className="text-7xl font-black">DYING MESSAGE</h1>
           <p className="mt-5 text-2xl text-white/60">방 정보를 불러오는 중...</p>
         </div>
+      </main>
+    );
+  }
+
+  const roomPhase = getRoomPhase(room);
+
+  if (roomPhase === 'briefing') {
+    const caseFile = room.caseFile ?? {
+      number: '001',
+      title: '죽어가는 소설가',
+      briefing: [
+        '유명 소설가가 자신의 서재에서 숨진 채 발견되었습니다.',
+        '현장에는 정체를 알 수 없는 메모가 남아 있습니다.',
+        '범인은 거짓 단서를 흘리고 있습니다.',
+        '여러분은 형사입니다.',
+        '사건을 해결하십시오.'
+      ]
+    };
+
+    return (
+      <main className="grid min-h-screen place-items-center p-10">
+        <section className="w-full max-w-6xl rounded-[2.5rem] border border-raven-gold/40 bg-raven-panel/95 p-12 text-center shadow-2xl">
+          <p className="text-2xl font-black tracking-[0.4em] text-raven-gold">
+            CASE FILE #{caseFile.number}
+          </p>
+          <h1 className="mt-6 text-7xl font-black">{caseFile.title}</h1>
+
+          <div className="mx-auto mt-10 max-w-4xl space-y-5 rounded-3xl border border-white/10 bg-black/20 p-10">
+            {caseFile.briefing.map((line, index) => (
+              <p
+                key={`${line}-${index}`}
+                className={`font-bold ${
+                  index >= caseFile.briefing.length - 2
+                    ? 'text-4xl text-raven-gold'
+                    : 'text-3xl text-white/90'
+                }`}
+              >
+                {line}
+              </p>
+            ))}
+          </div>
+
+          <p className="mt-10 text-2xl font-bold text-white/50">
+            교사의 안내에 집중해 주세요.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (roomPhase === 'countdown') {
+    const left = room.countdownEndsAt
+      ? Math.max(0, Math.ceil((room.countdownEndsAt - now) / 1000))
+      : 0;
+
+    return (
+      <main className="grid min-h-screen place-items-center">
+        <section className="text-center">
+          <p className="text-5xl font-black text-raven-gold">
+            ROUND {room.round}
+          </p>
+          <div className="mt-8 text-[16rem] font-black leading-none">
+            {left > 0 ? left : 'START'}
+          </div>
+          <p className="mt-8 text-3xl font-bold text-white/60">
+            수사를 시작합니다.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (roomPhase === 'lobby') {
+    return (
+      <main className="grid min-h-screen place-items-center p-10">
+        <section className="w-full max-w-5xl rounded-3xl border border-white/15 bg-raven-panel/95 p-10 text-center">
+          <h1 className="text-7xl font-black">DYING MESSAGE</h1>
+          <p className="mt-4 text-3xl font-black text-raven-gold">
+            방 코드 {room.code}
+          </p>
+          <div className="mt-10 grid grid-cols-2 gap-4">
+            {teams.length === 0 ? (
+              <div className="col-span-2 rounded-3xl bg-black/20 p-12">
+                <div className="text-7xl">📱</div>
+                <p className="mt-5 text-3xl font-black">
+                  학생 조의 입장을 기다리는 중입니다.
+                </p>
+              </div>
+            ) : (
+              teams.map((team) => (
+                <div
+                  key={team.name}
+                  className="rounded-2xl border border-white/15 bg-white/10 p-5 text-3xl font-black"
+                >
+                  ✅ {team.name}
+                </div>
+              ))
+            )}
+          </div>
+          <p className="mt-8 text-2xl text-white/50">
+            모든 조가 입장하면 사건 브리핑을 시작합니다.
+          </p>
+        </section>
       </main>
     );
   }
