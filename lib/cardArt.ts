@@ -14,7 +14,7 @@ const criminalSlugs: Record<string, string> = {
   과학자: 'scientist',
   복서: 'boxer',
   마약상: 'drug-dealer',
-  시민: 'citizen',
+  시인: 'poet',
   영화감독: 'film-director',
   건축가: 'architect',
   미용사: 'hairdresser',
