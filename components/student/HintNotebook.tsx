@@ -1,61 +1,25 @@
 import type { Room } from '@/lib/localGame';
 import { HintChip } from '@/components/common/HintChip';
 
-export function HintNotebook({
-  room,
-  compact = false
-}: {
-  room: Room;
-  compact?: boolean;
-}) {
-  if (compact) {
-    return (
-      <section className="paper rounded-2xl px-4 py-3">
-        <div className="flex h-full items-center gap-4">
-          <h2 className="shrink-0 text-lg font-black">공통 힌트</h2>
-
-          <div className="grid flex-1 grid-cols-3 gap-3">
-            {(['criminal', 'weapon', 'motive'] as const).map((key) => (
-              <div
-                key={key}
-                className="flex min-w-0 items-center gap-2 border-l border-black/15 pl-3"
-              >
-                <b className="shrink-0 rounded-lg bg-purple-800 px-2 py-1 text-xs text-white">
-                  {key === 'criminal' ? '범인' : key === 'weapon' ? '도구' : '동기'}
-                </b>
-                <div className="flex min-w-0 flex-wrap gap-1.5">
-                  {room.hints[key].length === 0 ? (
-                    <span className="text-xs text-black/40">미공개</span>
-                  ) : (
-                    room.hints[key].map((tile) => (
-                      <HintChip key={tile.id} tile={tile} />
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
+export function HintNotebook({ room }: { room: Room }) {
   return (
-    <section className="paper rounded-3xl p-5">
-      <h2 className="text-center text-2xl font-black">공통 힌트</h2>
-
-      {(['criminal', 'weapon', 'motive'] as const).map((key) => (
-        <div key={key} className="border-b border-black/20 py-3">
-          <b className="rounded-xl bg-purple-800 px-3 py-1 text-white">
-            {key === 'criminal' ? '범인' : key === 'weapon' ? '도구' : '동기'}
-          </b>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {room.hints[key].map((tile) => (
-              <HintChip key={tile.id} tile={tile} />
-            ))}
+    <section className="rounded-2xl border border-white/15 bg-raven-panel/95 p-4 shadow-xl">
+      <div className="grid gap-3 md:grid-cols-3">
+        {(['criminal', 'weapon', 'motive'] as const).map((key) => (
+          <div key={key} className="rounded-xl border border-white/10 bg-black/15 p-3">
+            <b className="text-sm text-purple-200">
+              {key === 'criminal' ? '범인 힌트' : key === 'weapon' ? '도구 힌트' : '동기 힌트'}
+            </b>
+            <div className="mt-2 flex min-h-9 flex-wrap gap-2">
+              {room.hints[key].length > 0 ? (
+                room.hints[key].map((tile) => <HintChip key={tile.id} tile={tile} />)
+              ) : (
+                <span className="text-sm text-white/30">공개 전</span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </section>
   );
 }

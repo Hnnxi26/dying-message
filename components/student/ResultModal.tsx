@@ -3,6 +3,7 @@ export type ResultModalData = {
   title: string;
   message: string;
   icon: string;
+  actionLabel?: string;
 };
 
 export function ResultModal({
@@ -15,7 +16,7 @@ export function ResultModal({
   const success = data.kind === 'success' || data.kind === 'final-success';
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-6">
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-6 backdrop-blur-sm">
       <section
         className={`w-full max-w-xl rounded-3xl border p-8 text-center shadow-2xl ${
           success
@@ -31,7 +32,7 @@ export function ResultModal({
           onClick={onClose}
           className="mt-7 w-full rounded-2xl bg-white px-5 py-4 text-lg font-black text-black"
         >
-          확인
+          {data.actionLabel ?? '확인'}
         </button>
       </section>
     </div>

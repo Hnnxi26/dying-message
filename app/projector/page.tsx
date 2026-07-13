@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { HintChip } from '@/components/common/HintChip';
-import { IllustratedCard } from '@/components/common/IllustratedCard';
 import {
   getRemoteRoom,
   getSavedTeacherRoomCode,
   useRemoteRoom
 } from '@/lib/roomStore';
+import type { Category } from '@/lib/localGame';
 import { getRoomPhase } from '@/lib/localGame';
+import { getCardArt, getCardBack } from '@/lib/cardArt';
 
 const statusView: Record<
   string,
@@ -68,6 +69,59 @@ function TeamCard({
 }
 
 
+
+function RevealCard({
+  category,
+  label,
+  name,
+  revealed
+}: {
+  category: Category;
+  label: string;
+  name: string;
+  revealed: boolean;
+}) {
+  const art = getCardArt(category, name);
+  const back = getCardBack(category);
+  const [frontFailed, setFrontFailed] = useState(false);
+  const [backFailed, setBackFailed] = useState(false);
+  const fallback = category === 'criminals' ? '♙' : category === 'weapons' ? '⚒' : '✦';
+
+  return (
+    <div className="text-center">
+      <p className="mb-4 text-2xl font-black text-raven-gold">{label}</p>
+      <div className="relative mx-auto aspect-[2/3] w-56 [perspective:1200px]">
+        <div
+          className="absolute inset-0 transition-transform duration-700 [transform-style:preserve-3d]"
+          style={{ transform: revealed ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+        >
+          <div className="absolute inset-0 overflow-hidden rounded-3xl border-2 border-white/25 bg-[#161224] shadow-2xl [backface-visibility:hidden]">
+            {!backFailed ? (
+              <img src={back} alt="" onError={() => setBackFailed(true)} className="h-full w-full object-cover" />
+            ) : (
+              <div className="grid h-full place-items-center text-center">
+                <div><b className="tracking-[0.18em] text-white/70">DYING MESSAGE</b><div className="mt-8 text-7xl text-white/25">{fallback}</div></div>
+              </div>
+            )}
+          </div>
+          <div className="absolute inset-0 overflow-hidden rounded-3xl border-2 border-raven-gold/50 bg-[#f4efe5] text-[#211934] shadow-2xl [backface-visibility:hidden] [transform:rotateY(180deg)]">
+            <div className="h-[78%] bg-[#ddd3c2]">
+              {art && !frontFailed ? (
+                <img src={art.image} alt="" onError={() => setFrontFailed(true)} className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full place-items-center text-8xl">{fallback}</div>
+              )}
+            </div>
+            <div className="grid h-[22%] place-items-center border-t border-black/15 bg-[#f8f3e9] px-3">
+              <b className="text-2xl">{name}</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function compareTeamNames(
   a: { name: string },
   b: { name: string }
@@ -84,6 +138,7 @@ export default function ProjectorPage() {
   const [entryError, setEntryError] = useState('');
   const [checking, setChecking] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [resultStartedAt, setResultStartedAt] = useState<number | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 200);
@@ -119,6 +174,18 @@ export default function ProjectorPage() {
   const submittedCount = teams.filter(
     (team) => team.status === 'submitted'
   ).length;
+
+
+  const finalFinished =
+    Boolean(room) &&
+    room!.round === 4 &&
+    teams.length > 0 &&
+    teams.every((team) => ['success', 'gameover'].includes(team.status));
+
+  useEffect(() => {
+    if (finalFinished && resultStartedAt === null) setResultStartedAt(Date.now());
+    if (!finalFinished && resultStartedAt !== null) setResultStartedAt(null);
+  }, [finalFinished, resultStartedAt]);
 
   async function enterRoom() {
     const normalized = inputCode.trim().toUpperCase();
@@ -265,90 +332,14 @@ export default function ProjectorPage() {
     return (
       <main className="grid min-h-screen place-items-center">
         <section className="text-center">
-          <p className="text-5xl font-black text-raven-gold">
-            {room.round === 4 ? 'FINAL ROUND' : `ROUND ${room.round}`}
+          <p className={`text-5xl font-black ${room.round === 4 ? 'text-red-300' : 'text-raven-gold'}`}>
+            {room.round === 4 ? 'FINAL ROUND · 최종 추리' : `ROUND ${room.round}`}
           </p>
           <div className="mt-8 text-[16rem] font-black leading-none">
             {left > 0 ? left : 'START'}
           </div>
           <p className="mt-8 text-3xl font-bold text-white/60">
-            {room.round === 4
-              ? '마지막 추리를 시작합니다. 범인, 도구, 동기를 확정하세요.'
-              : '수사를 시작합니다.'}
-          </p>
-        </section>
-      </main>
-    );
-  }
-
-  const finalFinished =
-    room.round === 4 &&
-    teams.length > 0 &&
-    teams.every((team) =>
-      ['success', 'gameover'].includes(team.status)
-    );
-
-  if (finalFinished) {
-    return (
-      <main className="min-h-screen p-8">
-        <section className="mx-auto max-w-7xl rounded-[2.5rem] border border-raven-gold/40 bg-raven-panel/95 p-10 shadow-2xl">
-          <div className="text-center">
-            <p className="text-2xl font-black tracking-[0.35em] text-raven-gold">
-              CASE FILE #{room.caseFile?.number ?? '001'}
-            </p>
-            <h1 className="mt-4 text-6xl font-black">사건의 진실</h1>
-          </div>
-
-          <div className="mx-auto mt-10 grid max-w-5xl grid-cols-3 gap-7">
-            <div>
-              <p className="mb-3 text-center text-2xl font-black text-white/65">범인</p>
-              <IllustratedCard
-                category="criminals"
-                name={room.answer.criminal}
-              />
-            </div>
-            <div>
-              <p className="mb-3 text-center text-2xl font-black text-white/65">도구</p>
-              <IllustratedCard
-                category="weapons"
-                name={room.answer.weapon}
-              />
-            </div>
-            <div>
-              <p className="mb-3 text-center text-2xl font-black text-white/65">동기</p>
-              <IllustratedCard
-                category="motives"
-                name={room.answer.motive}
-              />
-            </div>
-          </div>
-
-          <div className="mt-12 border-t border-white/15 pt-8">
-            <h2 className="text-center text-3xl font-black">조별 수사 결과</h2>
-            <div className="mx-auto mt-6 grid max-w-5xl grid-cols-2 gap-3">
-              {teams.map((team) => {
-                const solved = team.status === 'success';
-                return (
-                  <div
-                    key={team.name}
-                    className={`flex items-center justify-between rounded-2xl border p-5 ${
-                      solved
-                        ? 'border-green-300/40 bg-green-500/15'
-                        : 'border-red-300/40 bg-red-500/15'
-                    }`}
-                  >
-                    <b className="text-2xl">{team.name}</b>
-                    <span className="text-xl font-black">
-                      {solved ? '🟢 사건 해결' : '🔴 사건 해결 실패'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <p className="mt-10 text-center text-2xl font-bold text-white/55">
-            수사가 종료되었습니다.
+            수사를 시작합니다.
           </p>
         </section>
       </main>
@@ -390,6 +381,40 @@ export default function ProjectorPage() {
     );
   }
 
+
+  if (finalFinished) {
+    const elapsed = now - (resultStartedAt ?? now);
+    const revealCriminal = elapsed >= 900;
+    const revealWeapon = elapsed >= 2100;
+    const revealMotive = elapsed >= 3300;
+    const revealResults = elapsed >= 4600;
+
+    return (
+      <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_center,#3a2030,#090710_72%)] p-10">
+        <section className="w-full max-w-7xl text-center">
+          <p className="text-2xl font-black tracking-[0.35em] text-raven-gold">사건의 진실</p>
+          <h1 className="mt-4 text-6xl font-black">최종 수사 결과</h1>
+
+          <div className="mt-10 grid grid-cols-3 gap-8">
+            <RevealCard category="criminals" label="범인" name={room.answer.criminal} revealed={revealCriminal} />
+            <RevealCard category="weapons" label="도구" name={room.answer.weapon} revealed={revealWeapon} />
+            <RevealCard category="motives" label="동기" name={room.answer.motive} revealed={revealMotive} />
+          </div>
+
+          <div className={`mt-10 transition duration-700 ${revealResults ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
+            <div className="grid grid-cols-2 gap-3 rounded-3xl border border-white/15 bg-black/25 p-6">
+              {teams.map((team) => (
+                <div key={team.name} className={`rounded-2xl border p-4 text-2xl font-black ${team.status === 'success' ? 'border-green-300/40 bg-green-400/10 text-green-100' : 'border-red-300/40 bg-red-400/10 text-red-100'}`}>
+                  {team.name} · {team.status === 'success' ? '사건 해결' : '사건 해결 실패'}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen p-8">
       <header className="grid grid-cols-3 items-center rounded-3xl border border-white/15 bg-raven-panel/90 px-8 py-6">
@@ -400,8 +425,8 @@ export default function ProjectorPage() {
 
         <div className="text-center">
           <p className="text-lg font-bold text-white/50">현재 라운드</p>
-          <p className="mt-1 text-6xl font-black text-raven-gold">
-            ROUND {room.round}
+          <p className={`mt-1 text-6xl font-black ${room.round === 4 ? 'text-red-300' : 'text-raven-gold'}`}>
+            {room.round === 4 ? 'FINAL ROUND' : `ROUND ${room.round}`}
           </p>
         </div>
 
