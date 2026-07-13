@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { HintChip } from '@/components/common/HintChip';
+import { IllustratedCard } from '@/components/common/IllustratedCard';
 import {
   getRemoteRoom,
   getSavedTeacherRoomCode,
@@ -218,10 +219,10 @@ export default function ProjectorPage() {
       title: '죽어가는 소설가',
       briefing: [
         '유명 소설가가 자신의 서재에서 숨진 채 발견되었습니다.',
-        '현장에는 정체를 알 수 없는 메모가 남아 있습니다.',
-        '범인은 거짓 단서를 흘리고 있습니다.',
-        '여러분은 형사입니다.',
-        '사건을 해결하십시오.'
+        '피해자는 마지막 순간, 범인을 알리기 위해 몇 개의 메시지를 남겼습니다.',
+        '여러분은 피해자가 남긴 메시지의 의미를 해석하여 사건의 진실을 밝혀내야 합니다.',
+        '여러분은 이 사건의 담당 형사입니다.',
+        '수사를 시작하십시오.'
       ]
     };
 
@@ -272,6 +273,80 @@ export default function ProjectorPage() {
           </div>
           <p className="mt-8 text-3xl font-bold text-white/60">
             수사를 시작합니다.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  const finalFinished =
+    room.round === 4 &&
+    teams.length > 0 &&
+    teams.every((team) =>
+      ['success', 'gameover'].includes(team.status)
+    );
+
+  if (finalFinished) {
+    return (
+      <main className="min-h-screen p-8">
+        <section className="mx-auto max-w-7xl rounded-[2.5rem] border border-raven-gold/40 bg-raven-panel/95 p-10 shadow-2xl">
+          <div className="text-center">
+            <p className="text-2xl font-black tracking-[0.35em] text-raven-gold">
+              CASE FILE #{room.caseFile?.number ?? '001'}
+            </p>
+            <h1 className="mt-4 text-6xl font-black">사건의 진실</h1>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-5xl grid-cols-3 gap-7">
+            <div>
+              <p className="mb-3 text-center text-2xl font-black text-white/65">범인</p>
+              <IllustratedCard
+                category="criminals"
+                name={room.answer.criminal}
+              />
+            </div>
+            <div>
+              <p className="mb-3 text-center text-2xl font-black text-white/65">도구</p>
+              <IllustratedCard
+                category="weapons"
+                name={room.answer.weapon}
+              />
+            </div>
+            <div>
+              <p className="mb-3 text-center text-2xl font-black text-white/65">동기</p>
+              <IllustratedCard
+                category="motives"
+                name={room.answer.motive}
+              />
+            </div>
+          </div>
+
+          <div className="mt-12 border-t border-white/15 pt-8">
+            <h2 className="text-center text-3xl font-black">조별 수사 결과</h2>
+            <div className="mx-auto mt-6 grid max-w-5xl grid-cols-2 gap-3">
+              {teams.map((team) => {
+                const solved = team.status === 'success';
+                return (
+                  <div
+                    key={team.name}
+                    className={`flex items-center justify-between rounded-2xl border p-5 ${
+                      solved
+                        ? 'border-green-300/40 bg-green-500/15'
+                        : 'border-red-300/40 bg-red-500/15'
+                    }`}
+                  >
+                    <b className="text-2xl">{team.name}</b>
+                    <span className="text-xl font-black">
+                      {solved ? '🟢 사건 해결' : '🔴 사건 해결 실패'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <p className="mt-10 text-center text-2xl font-bold text-white/55">
+            수사가 종료되었습니다.
           </p>
         </section>
       </main>
