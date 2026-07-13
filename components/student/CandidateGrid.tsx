@@ -52,7 +52,7 @@ function CandidateCard({
         'group relative aspect-[2/3] min-h-36 rounded-2xl outline-none',
         'transition duration-200',
         selected ? '-translate-y-2 scale-[1.025]' : 'hover:-translate-y-1',
-        excluded ? 'cursor-not-allowed opacity-35 grayscale' : ''
+        excluded ? 'cursor-not-allowed' : ''
       ].join(' ')}
       style={{ perspective: '1100px' }}
     >
@@ -60,7 +60,10 @@ function CandidateCard({
         className="absolute inset-0 block transition-transform duration-700"
         style={{
           transformStyle: 'preserve-3d',
-          transform: revealed ? 'rotateY(180deg)' : 'rotateY(0deg)'
+          transform:
+            revealed && !excluded
+              ? 'rotateY(180deg)'
+              : 'rotateY(0deg)'
         }}
       >
         <span
@@ -136,11 +139,6 @@ function CandidateCard({
             </span>
           )}
 
-          {excluded && (
-            <span className="absolute inset-0 grid place-items-center bg-black/20 text-7xl font-black text-black/55">
-              ×
-            </span>
-          )}
         </span>
       </span>
     </button>
