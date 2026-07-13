@@ -266,13 +266,15 @@ export default function ProjectorPage() {
       <main className="grid min-h-screen place-items-center">
         <section className="text-center">
           <p className="text-5xl font-black text-raven-gold">
-            ROUND {room.round}
+            {room.round === 4 ? 'FINAL ROUND' : `ROUND ${room.round}`}
           </p>
           <div className="mt-8 text-[16rem] font-black leading-none">
             {left > 0 ? left : 'START'}
           </div>
           <p className="mt-8 text-3xl font-bold text-white/60">
-            수사를 시작합니다.
+            {room.round === 4
+              ? '마지막 추리를 시작합니다. 범인, 도구, 동기를 확정하세요.'
+              : '수사를 시작합니다.'}
           </p>
         </section>
       </main>

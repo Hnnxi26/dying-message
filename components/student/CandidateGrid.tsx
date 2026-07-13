@@ -49,7 +49,7 @@ function CandidateCard({
       onClick={onClick}
       aria-pressed={selected}
       className={[
-        'group relative aspect-[2/3] min-h-36 rounded-2xl outline-none',
+        'group relative aspect-[2/3] min-h-44 rounded-2xl outline-none',
         'transition duration-200',
         selected ? '-translate-y-2 scale-[1.025]' : 'hover:-translate-y-1',
         excluded ? 'cursor-not-allowed' : ''
@@ -172,7 +172,7 @@ export function CandidateGrid({
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-9">
+      <div className={`grid gap-4 ${team.round === 4 ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-7'}`}>
         {cards.map((card, index) => (
           <CandidateCard
             key={card}
