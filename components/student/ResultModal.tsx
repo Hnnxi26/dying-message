@@ -8,10 +8,12 @@ export type ResultModalData = {
 
 export function ResultModal({
   data,
-  onClose
+  onClose,
+  dismissible = true
 }: {
   data: ResultModalData;
   onClose: () => void;
+  dismissible?: boolean;
 }) {
   const success = data.kind === 'success' || data.kind === 'final-success';
 
@@ -27,13 +29,19 @@ export function ResultModal({
         <div className="text-7xl">{data.icon}</div>
         <h2 className="mt-5 text-4xl font-black">{data.title}</h2>
         <p className="mt-4 text-lg font-bold text-white/90">{data.message}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-7 w-full rounded-2xl bg-white px-5 py-4 text-lg font-black text-black"
-        >
-          {data.actionLabel ?? '확인'}
-        </button>
+        {dismissible ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-7 w-full rounded-2xl bg-white px-5 py-4 text-lg font-black text-black"
+          >
+            {data.actionLabel ?? '확인'}
+          </button>
+        ) : (
+          <div className="mt-7 rounded-2xl border border-white/15 bg-black/20 px-5 py-4 font-black text-white/70">
+            다음 라운드 시작 대기 중
+          </div>
+        )}
       </section>
     </div>
   );

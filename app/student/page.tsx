@@ -77,6 +77,8 @@ export default function StudentPage() {
           message: '남은 추리 타일이 없습니다.',
           icon: '☠'
         });
+      } else if (team.status === 'thinking') {
+        setResultModal(null);
       }
     }
     previousStatusRef.current = team.status;
@@ -91,7 +93,7 @@ export default function StudentPage() {
     sessionStorage.setItem(key, '1');
     const timer = window.setTimeout(() => setShowFinalIntro(false), 2600);
     return () => window.clearTimeout(timer);
-  }, [room, joinedTeamName]);
+  }, [room?.code, room?.round, joinedTeamName]);
 
   async function verifyCode(value = roomCode, showError = true) {
     const normalized = value.trim().toUpperCase();
@@ -146,6 +148,18 @@ export default function StudentPage() {
 
   const team = joinedTeamName ? room.teams[joinedTeamName] : undefined;
   if (team && !previousStatusRef.current) previousStatusRef.current = team.status;
+
+  const persistentSuccessModal: ResultModalData | null =
+    team?.status === 'complete' && room.round <= 3
+      ? {
+          kind: 'success',
+          title: '제외 성공!',
+          message: `ROUND ${team.round} 완료. 교사가 다음 라운드를 시작할 때까지 기다려 주세요.`,
+          icon: '✅'
+        }
+      : null;
+
+  const activeResultModal = persistentSuccessModal ?? resultModal;
 
   async function joinTeam() {
     if (!room) return;
@@ -249,7 +263,13 @@ export default function StudentPage() {
             )}
           </div>
         </section>
-        {resultModal && <ResultModal data={resultModal} onClose={() => setResultModal(null)} />}
+        {activeResultModal && (
+          <ResultModal
+            data={activeResultModal}
+            dismissible={!persistentSuccessModal}
+            onClose={() => setResultModal(null)}
+          />
+        )}
       </main>
     );
   }
@@ -378,7 +398,13 @@ export default function StudentPage() {
         </div>
       )}
 
-      {resultModal && <ResultModal data={resultModal} onClose={() => setResultModal(null)} />}
+      {activeResultModal && (
+          <ResultModal
+            data={activeResultModal}
+            dismissible={!persistentSuccessModal}
+            onClose={() => setResultModal(null)}
+          />
+        )}
     </>
   );
 }
